@@ -2,7 +2,7 @@
 
 Citation: 
 
-Semi-supervised teacher-student deep neural net-work for materials discovery” by Daniel Gleaves, Edirisuriya M. Dilanga Siriwardane,Yong Zhao, and JianjunHu.
+Semi-supervised teacher-student deep neural network for materials discovery” by Daniel Gleaves, Edirisuriya M. Dilanga Siriwardane,Yong Zhao, and JianjunHu.
 
 Machine learning and evolution laboratory
 
