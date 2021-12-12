@@ -43,7 +43,20 @@ This package requires:
 - [scikit-learn](http://scikit-learn.org/stable/)
 - [pymatgen](http://pymatgen.org)
 
+If you are new to Python, the easiest way of installing the prerequisites is via [conda](https://conda.io/docs/index.html). After installing [conda](http://conda.pydata.org/), run the following command to create a new [environment](https://conda.io/docs/user-guide/tasks/manage-environments.html) named `cgcnn` and install all prerequisites:
+
+```bash
+conda upgrade conda
+conda create -n tsdnn python=3 scikit-learn pytorch torchvision pymatgen -c pytorch -c conda-forge
+```
+
 *Note: this code is tested for PyTorch v1.0.0+ and is not compatible with versions below v0.4.0 due to some breaking changes.
+
+This creates a conda environment for running TSDNN. Before using TSDNN, activate the environment by:
+
+```bash
+conda activate tsdnn
+```
 
 ## Usage
 
