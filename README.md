@@ -16,8 +16,8 @@ This software package implements the Meta Pseudo Labels (MPL) semi-supervised le
 
 The package provides two major functions:
 
-- Train a semi-supervised TSDNN model with a customized dataset.
-- Predict material synthesizability of new crystals with a pre-trained TSDNN model.
+- Train a semi-supervised TSDNN classification model with a customized dataset.
+- Predict material synthesizability and formation energy of new crystals with a pre-trained TSDNN model.
 
 The following paper describes the details of the CGCNN architecture:
 
