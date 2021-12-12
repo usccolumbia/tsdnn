@@ -148,6 +148,10 @@ To reproduce our paper, you can download the corresponding datasets following th
 
 This software was primarily written by [Daniel Gleaves](http://mleg.cse.sc.edu/people.html) who was advised by [Prof. Jianjun Hu](https://cse.sc.edu/~jianjunh/index.html). This software builds upon work by [Tian Xie](https://github.com/txie-93), [Hieu Pham](https://github.com/google-research/google-research/tree/master/meta_pseudo_labels), and [Jungdae Kim](https://github.com/kekmodel).
 
+## Acknowledgements
+
+Research reported in this work was supported in part by NSF under grants 1940099 and 1905775. The views, perspective,and content do not necessarily represent the official views of NSF. This work was supported in part by the South Carolina Honors College Research Program. This work is partially supported by a grant from the University of South Carolina Magellan Scholar Program.
+
 ## License
 
 TSDNN is released under the MIT License.
