@@ -54,7 +54,7 @@ To input crystal structures to TSDNN, you will need to define a customized datas
 Before defining a customized dataset, you will need:
 
 - [CIF](https://en.wikipedia.org/wiki/Crystallographic_Information_File) files recording the structure of the crystals that you are interested in
-- The target label for each crystal (not needed for predicting, but you need to put some random numbers in `id_prop.csv`)
+- The target label for each crystal (not needed for predicting, but you need to put some random numbers in `data_test.csv`)
 
 You can create a customized dataset by creating a directory `root_dir` with the following files: 
 
