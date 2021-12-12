@@ -19,13 +19,9 @@ The package provides two major functions:
 - Train a semi-supervised TSDNN classification model with a customized dataset.
 - Predict material synthesizability and formation energy of new crystals with a pre-trained TSDNN model.
 
-The following paper describes the details of the CGCNN architecture:
+The following paper describes the details of the CGCNN architecture, a graph neural network model for materials property prediction: [CGCNN paper](https://link.aps.org/doi/10.1103/PhysRevLett.120.145301)
 
-[Crystal Graph Convolutional Neural Networks for an Accurate and Interpretable Prediction of Material Properties](https://link.aps.org/doi/10.1103/PhysRevLett.120.145301)
-
-The following paper describes the details of the semi-supervised learning framework:
-
-[Meta Pseudo Labels](https://arxiv.org/abs/2003.10580)
+The following paper describes the details of the semi-supervised learning framework that we used in our model: [Meta Pseudo Labels](https://arxiv.org/abs/2003.10580)
 
 ## Table of Contents
 
