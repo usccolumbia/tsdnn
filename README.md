@@ -1,6 +1,17 @@
 # Deep Semi-Supervised Teacher-Student Material Synthesizability Prediction
 
-This software package implements the Meta Pseudo Labels (MPL) semi-supervised learning method with Crystal Graph Convolutional Neural Networks (CGCNN) with that takes an arbitary crystal structure to predict material synthesizability.
+Citation: 
+
+Semi-supervised teacher-student deep neural net-work for materials discovery” by Daniel Gleaves, Edirisuriya M. Dilanga Siriwardane,Yong Zhao, and JianjunHu.
+
+Machine learning and evolution laboratory
+
+Department of Computer Science and Engineering
+
+University of South Carolina
+
+
+This software package implements the Meta Pseudo Labels (MPL) semi-supervised learning method with Crystal Graph Convolutional Neural Networks (CGCNN) with that takes an arbitary crystal structure to predict material synthesizability and whether it has positive or negative formation energy
 
 The package provides two major functions:
 
