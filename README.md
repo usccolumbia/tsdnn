@@ -29,7 +29,7 @@ The following paper describes the details of the semi-supervised learning framew
 - [Usage](#usage)
   - [Define a customized dataset](#define-a-customized-dataset)
   - [Train a TSDNN model](#train-a-TSDNN-model)
-  - [Predict material properties with a pre-trained TSDNN model](#predict-material-properties-with-a-pre-trained-TSDNN-model)
+  - [Classify materials with a pre-trained TSDNN model](#classify-materials-with-a-pre-trained-TSDNN-model)
 - [Data](#data)
 - [Authors](#authors)
 - [License](#license)
@@ -67,7 +67,7 @@ You can create a customized dataset by creating a directory `root_dir` with the 
 3. `ID.cif`: a [CIF](https://en.wikipedia.org/wiki/Crystallographic_Information_File) file that recodes the crystal structure, where `ID` is the unique `ID` for the crystal.
 
 (4.) `data_predict`: a [CSV](https://en.wikipedia.org/wiki/Comma-separated_values) file with two columns. The first column recodes a unique `ID` for each crystal, and the second column can be filled with alternating 1 and 0 (the second column is still needed). 
-This is the file that will be used if you want to predict material properties with `predict.py`. 
+This is the file that will be used if you want to classify materials with `predict.py`. 
 
 The structure of the `root_dir` should be:
 
