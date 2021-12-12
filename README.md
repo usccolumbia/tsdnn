@@ -10,6 +10,7 @@ Department of Computer Science and Engineering
 
 University of South Carolina
 
+<hr>
 
 This software package implements the Meta Pseudo Labels (MPL) semi-supervised learning method with Crystal Graph Convolutional Neural Networks (CGCNN) with that takes an arbitary crystal structure to predict material synthesizability and whether it has positive or negative formation energy
 
