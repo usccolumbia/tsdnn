@@ -3,7 +3,7 @@ import operator
 import random
 import pandas as pd
 import numpy as np
-import cgcnn.train as t
+import tsdnn.train as t
 import sys
 import csv
 import torch
