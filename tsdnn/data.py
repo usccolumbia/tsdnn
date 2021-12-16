@@ -16,7 +16,7 @@ from torch.utils.data.dataloader import default_collate
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
-def get_pos_unl_val_test_loader(labeled_dataset, unlabeled_dataset, collate_fn=default_collate,
+def get_pos_unl_val_test_loader(full_dataset=None, labeled_dataset=None, unlabeled_dataset=None, collate_fn=default_collate,
                               batch_size=64, train_ratio=None,
                               val_ratio=0.1, test_ratio=0.1, return_test=False,
                               num_workers=1, pin_memory=False, **kwargs):
@@ -305,17 +305,39 @@ class CIFData(Dataset):
     cif_id: str or int
     """
     def __init__(self, root_dir, labeled, max_num_nbr=12, radius=16, dmin=0, step=0.2,
-                 random_seed=123, predict=False):
+                 random_seed=123, predict=False, uds=False):
         self.root_dir = root_dir
         self.max_num_nbr, self.radius = max_num_nbr, radius
         assert os.path.exists(root_dir), 'root_dir does not exist!'
-        id_prop_file = os.path.join(self.root_dir, (('data_labeled.csv' if labeled else 'data_unlabeled.csv') if not predict else 'data_test.csv'))
+        if uds:
+            id_prop_file = os.path.join(self.root_dir, 'dataset.csv')
+        elif labeled:
+            id_prop_file = os.path.join(self.root_dir, 'data_labeled.csv')
+        elif predict:
+            id_prop_file = os.path.join(self.root_dir, 'data_test.csv')
+        else:
+            id_prop_file = os.path.join(self.root_dir, 'data_unlabeled.csv')
         assert os.path.exists(id_prop_file), f'{id_prop_file} does not exist!'
+
+        random.seed(random_seed)
+        positive_data = []
+        unlabeled_data = []
         with open(id_prop_file) as f:
             reader = csv.reader(f)
-            self.id_prop_data = [row for row in reader]
-        random.seed(random_seed)
-        random.shuffle(self.id_prop_data)
+            if args.uds:
+                for row in reader:
+                    if int(row[1]) == 1:
+                        positive_data.append(row)
+                    elif int(row[1]) == 0:
+                        unlabeled_data.append(row)
+                    else:
+                        raise Exception("ERROR: dataset value must be 1 or 0")
+                random.shuffle(unlabeled_data)
+                self.id_prop_data = positive_data + unlabeled_data
+            else:
+                self.id_prop_data = [row for row in reader]
+                random.shuffle(self.id_prop_data)
+
         atom_init_file = os.path.join(self.root_dir, 'atom_init.json')
         assert os.path.exists(atom_init_file), 'atom_init.json does not exist!'
         self.ari = AtomCustomJSONInitializer(atom_init_file)

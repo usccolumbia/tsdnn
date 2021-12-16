@@ -22,124 +22,186 @@ from tsdnn.data import collate_pool, get_pos_unl_val_test_loader
 from tsdnn.model import CrystalGraphConvNet
 
 
-def main(train_args):
-    global args, t_best_mae_error, s_best_mae_error
-    args = train_args
+parser = argparse.ArgumentParser(description='Semi-Supervised Crystal Graph Convolutional Neural Networks')
+parser.add_argument('data_options', metavar='OPTIONS', nargs='+', help='dataset options, started with the path to root dir, then other options')
+parser.add_argument('--disable-cuda', action='store_true', help='Disable CUDA')
+parser.add_argument('--uds', '--udsteps', default=0, type=int, metavar='N', help='number of unsupervised PU learning iterations to perform')
+parser.add_argument('-j', '--workers', default=0, type=int, metavar='N', help='number of data loading workers (default: 0)')
+parser.add_argument('-g', '--gpu', default=0, type=int, metavar='N', help='gpu to run on (default: 0)')
+parser.add_argument('--teacher', default='', type=str, metavar='PATH', help='path to latest teacher checkpoint (default: none)')
+parser.add_argument('--student', default='', type=str, metavar='PATH', help='path to latest student checkpoint (default: none)')
+parser.add_argument('--epochs', default=50, type=int, metavar='N', help='number of total epochs to run (default: 30)')
+parser.add_argument('--start-epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
+parser.add_argument('-b', '--batch-size', default=256, type=int, metavar='N', help='mini-batch size (default: 256)')
+parser.add_argument('--lr', '--learning-rate', default=0.001, type=float, metavar='LR', help='initial learning rate (default: 0.01)')
+parser.add_argument('--lr-milestones', default=[100], nargs='+', type=int, metavar='N', help='milestones for scheduler (default: [100])')
+parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum')
+parser.add_argument('--weight-decay', '--wd', default=0, type=float, metavar='W', help='weight decay (default: 0)')
+parser.add_argument('--print-freq', '-p', default=10, type=int, metavar='N', help='print frequency (default: 10)')
+parser.add_argument('--iter', default=0, type=int, metavar='N', help='iteration number to save as (default=0)')
+train_group = parser.add_mutually_exclusive_group()
+train_group.add_argument('--train-ratio', default=0.7, type=float, metavar='N', help='number of training data to be loaded (default none)')
+train_group.add_argument('--train-size', default=None, type=int, metavar='N', help='number of training data to be loaded (default none)')
+valid_group = parser.add_mutually_exclusive_group()
+valid_group.add_argument('--val-ratio', default=0.1, type=float, metavar='N', help='percentage of validation data to be loaded (default 0.1)')
+valid_group.add_argument('--val-size', default=None, type=int, metavar='N', help='number of validation data to be loaded (default 1000)')
+test_group = parser.add_mutually_exclusive_group()
+test_group.add_argument('--test-ratio', default=0.2, type=float, metavar='N', help='percentage of test data to be loaded (default 0.1)')
+test_group.add_argument('--test-size', default=None, type=int, metavar='N', help='number of test data to be loaded (default 1000)')
+parser.add_argument('--optim', default='SGD', type=str, metavar='SGD', help='choose an optimizer, SGD or Adam, (default: SGD)')
+parser.add_argument('--atom-fea-len', default=90, type=int, metavar='N', help='number of hidden atom features in conv layers')
+parser.add_argument('--h-fea-len', default=180, type=int, metavar='N', help='number of hidden features after pooling')
+parser.add_argument('--n-conv', default=3, type=int, metavar='N', help='number of conv layers')
+parser.add_argument('--n-h', default=1, type=int, metavar='N', help='number of hidden layers after pooling')
+
+args = parser.parse_args(sys.argv[1:])
+
+args.cuda = not args.disable_cuda and torch.cuda.is_available()
+
+root_dir = args.data_options[0]
+
+
+def main():
+    global t_best_mae_error, s_best_mae_error
     t_best_mae_error = 0.
     s_best_mae_error = 0.
 
     # load data
-    labeled_dataset = CIFData(*args.data_options, labeled=True)
-    unlabeled_dataset = CIFData(*args.data_options, labeled=False)
-    collate_fn = collate_pool
-    labeled_loader, unlabeled_loader, val_loader, test_loader = get_pos_unl_val_test_loader(
-        labeled_dataset=labeled_dataset,
-        unlabeled_dataset=unlabeled_dataset,
-        collate_fn=collate_fn,
-        batch_size=args.batch_size,
-        train_ratio=args.train_ratio,
-        num_workers=args.workers,
-        val_ratio=args.val_ratio,
-        test_ratio=args.test_ratio,
-        pin_memory=args.cuda,
-        train_size=args.train_size,
-        val_size=args.val_size,
-        test_size=args.test_size,
-        return_test=True)
-
-    # target value normalizer
-    t_normalizer = Normalizer(torch.zeros(2))
-    t_normalizer.load_state_dict({'mean': 0., 'std': 1.})
-    s_normalizer = Normalizer(torch.zeros(2))
-    s_normalizer.load_state_dict({'mean': 0., 'std': 1.})
-
-
-    # build model
-    structures, _, _ = labeled_dataset[0]
-    orig_atom_fea_len = structures[0].shape[-1]
-    nbr_fea_len = structures[1].shape[-1]
-    t_model = CrystalGraphConvNet(orig_atom_fea_len, nbr_fea_len,
-                                atom_fea_len=args.atom_fea_len,
-                                n_conv=args.n_conv,
-                                h_fea_len=args.h_fea_len,
-                                n_h=args.n_h)
-    s_model = CrystalGraphConvNet(orig_atom_fea_len, nbr_fea_len,
-                                atom_fea_len=args.atom_fea_len,
-                                n_conv=args.n_conv,
-                                h_fea_len=args.h_fea_len,
-                                n_h=args.n_h)
-    if args.cuda:
-        t_model.cuda()
-        s_model.cuda()
-
-    # define loss func and optimizer
-    criterion = nn.CrossEntropyLoss()
-    if args.optim == 'SGD':
-        t_optimizer = optim.SGD(t_model.parameters(), args.lr,
-                              momentum=args.momentum,
-                              weight_decay=args.weight_decay)
-        s_optimizer = optim.SGD(s_model.parameters(), args.lr,
-                              momentum=args.momentum,
-                              weight_decay=args.weight_decay)
-    elif args.optim == 'Adam':
-        t_optimizer = optim.Adam(t_model.parameters(), args.lr,
-                               weight_decay=args.weight_decay)
-        s_optimizer = optim.Adam(s_model.parameters(), args.lr,
-                               weight_decay=args.weight_decay)
+    if args.uds:
+        full_dataset = CIFData(*args.data_options, uds=True)
     else:
-        raise NameError('Only SGD or Adam is allowed as --optim')
+        labeled_dataset = CIFData(*args.data_options, labeled=True)
+        unlabeled_dataset = CIFData(*args.data_options, labeled=False)
 
-    # optionally resume from a checkpoint
-    if args.teacher and args.student:
-        if os.path.isfile(args.teacher) and os.path.isfile(args.student):
-            assert str(args.iter) in args.teacher, 'Current iteration != teacher input file iteration'
-            assert str(args.iter) in args.student, 'Current iteration != student input file iteration'
+    num_to_train = 1
+    if args.uds:
+        num_to_train = args.uds
 
-            print("=> loading teacher checkpoint '{}'".format(args.teacher))
-            t_checkpoint = torch.load(args.teacher)
-            args.start_epoch = t_checkpoint['epoch']
-            t_best_mae_error = t_checkpoint['best_mae_error']
-            t_model.load_state_dict(t_checkpoint['state_dict'])
-            t_optimizer.load_state_dict(t_checkpoint['optimizer'])
-            t_normalizer.load_state_dict(t_checkpoint['normalizer'])
-            print("=> loaded checkpoint '{}' (epoch {})"
-                  .format(args.teacher, t_checkpoint['epoch']))
-
-            print("=> loading student checkpoint '{}'".format(args.student))
-            s_checkpoint = torch.load(args.student)
-            args.start_epoch = s_checkpoint['epoch']
-            s_best_mae_error = s_checkpoint['best_mae_error']
-            s_model.load_state_dict(s_checkpoint['state_dict'])
-            s_optimizer.load_state_dict(s_checkpoint['optimizer'])
-            s_normalizer.load_state_dict(s_checkpoint['normalizer'])
-            print("=> loaded checkpoint '{}' (epoch {})"
-                  .format(args.student, s_checkpoint['epoch']))
-            if t_checkpoint['epoch'] != s_checkpoint['epoch']:
-                raise Exception("=> teacher and student out of sync\nTeacher at epoch: {}\nStudent at epoch: {}"
-                    .format(t_checkpoint['epoch'], s_checkpoint['epoch']))
+    for mx in range(num_to_train):
+        collate_fn = collate_pool
+        if args.uds:
+            labeled_loader, unlabeled_loader, val_loader, test_loader = get_pos_unl_val_test_loader(
+                full_dataset=full_dataset
+                collate_fn=collate_fn,
+                batch_size=args.batch_size,
+                train_ratio=args.train_ratio,
+                num_workers=args.workers,
+                val_ratio=args.val_ratio,
+                test_ratio=args.test_ratio,
+                pin_memory=args.cuda,
+                train_size=args.train_size,
+                val_size=args.val_size,
+                test_size=args.test_size,
+                return_test=True)
         else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
-    elif args.teacher or args.student:
-        raise Exception("Must have both teacher and student or neither")
+            labeled_loader, unlabeled_loader, val_loader, test_loader = get_pos_unl_val_test_loader(
+                labeled_dataset=labeled_dataset,
+                unlabeled_dataset=unlabeled_dataset,
+                collate_fn=collate_fn,
+                batch_size=args.batch_size,
+                train_ratio=args.train_ratio,
+                num_workers=args.workers,
+                val_ratio=args.val_ratio,
+                test_ratio=args.test_ratio,
+                pin_memory=args.cuda,
+                train_size=args.train_size,
+                val_size=args.val_size,
+                test_size=args.test_size,
+                return_test=True)
 
-    t_scheduler = MultiStepLR(t_optimizer, milestones=args.lr_milestones,
-                            gamma=0.1)
-    s_scheduler = MultiStepLR(s_optimizer, milestones=args.lr_milestones,
-                            gamma=0.1)
+        # target value normalizer
+        t_normalizer = Normalizer(torch.zeros(2))
+        t_normalizer.load_state_dict({'mean': 0., 'std': 1.})
+        s_normalizer = Normalizer(torch.zeros(2))
+        s_normalizer.load_state_dict({'mean': 0., 'std': 1.})
 
-    # train models
-    mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterion, t_optimizer, s_optimizer, t_scheduler, s_scheduler, t_normalizer, s_normalizer)
 
-    # test best model
-    print('---------Evaluate Model on Test Set---------------')
-    if os.path.isfile(f'checkpoints/student_best_{args.iter}.pth.tar'):
-        best_checkpoint = torch.load(f'checkpoints/student_best_{args.iter}.pth.tar')
-    else:
-        best_checkpoint = torch.load(f'checkpoints/s_checkpoint_{args.iter}.pth.tar')
-    s_model.load_state_dict(best_checkpoint['state_dict'])
-    validate(labeled_loader, s_model, criterion, s_normalizer, test=True, predict=False, append=False)
-    validate(unlabeled_loader, s_model, criterion, s_normalizer, test=True, predict=False, append=True)
-    validate(test_loader, s_model, criterion, s_normalizer, test=True, predict=True, append=True)
+        # build model
+        structures, _, _ = labeled_dataset[0]
+        orig_atom_fea_len = structures[0].shape[-1]
+        nbr_fea_len = structures[1].shape[-1]
+        t_model = CrystalGraphConvNet(orig_atom_fea_len, nbr_fea_len,
+                                    atom_fea_len=args.atom_fea_len,
+                                    n_conv=args.n_conv,
+                                    h_fea_len=args.h_fea_len,
+                                    n_h=args.n_h)
+        s_model = CrystalGraphConvNet(orig_atom_fea_len, nbr_fea_len,
+                                    atom_fea_len=args.atom_fea_len,
+                                    n_conv=args.n_conv,
+                                    h_fea_len=args.h_fea_len,
+                                    n_h=args.n_h)
+        if args.cuda:
+            t_model.cuda()
+            s_model.cuda()
+
+        # define loss func and optimizer
+        criterion = nn.CrossEntropyLoss()
+        if args.optim == 'SGD':
+            t_optimizer = optim.SGD(t_model.parameters(), args.lr,
+                                  momentum=args.momentum,
+                                  weight_decay=args.weight_decay)
+            s_optimizer = optim.SGD(s_model.parameters(), args.lr,
+                                  momentum=args.momentum,
+                                  weight_decay=args.weight_decay)
+        elif args.optim == 'Adam':
+            t_optimizer = optim.Adam(t_model.parameters(), args.lr,
+                                   weight_decay=args.weight_decay)
+            s_optimizer = optim.Adam(s_model.parameters(), args.lr,
+                                   weight_decay=args.weight_decay)
+        else:
+            raise NameError('Only SGD or Adam is allowed as --optim')
+
+        # optionally resume from a checkpoint
+        if args.teacher and args.student:
+            if os.path.isfile(args.teacher) and os.path.isfile(args.student):
+                assert str(args.iter) in args.teacher, 'Current iteration != teacher input file iteration'
+                assert str(args.iter) in args.student, 'Current iteration != student input file iteration'
+
+                print("=> loading teacher checkpoint '{}'".format(args.teacher))
+                t_checkpoint = torch.load(args.teacher)
+                args.start_epoch = t_checkpoint['epoch']
+                t_best_mae_error = t_checkpoint['best_mae_error']
+                t_model.load_state_dict(t_checkpoint['state_dict'])
+                t_optimizer.load_state_dict(t_checkpoint['optimizer'])
+                t_normalizer.load_state_dict(t_checkpoint['normalizer'])
+                print("=> loaded checkpoint '{}' (epoch {})"
+                      .format(args.teacher, t_checkpoint['epoch']))
+
+                print("=> loading student checkpoint '{}'".format(args.student))
+                s_checkpoint = torch.load(args.student)
+                args.start_epoch = s_checkpoint['epoch']
+                s_best_mae_error = s_checkpoint['best_mae_error']
+                s_model.load_state_dict(s_checkpoint['state_dict'])
+                s_optimizer.load_state_dict(s_checkpoint['optimizer'])
+                s_normalizer.load_state_dict(s_checkpoint['normalizer'])
+                print("=> loaded checkpoint '{}' (epoch {})"
+                      .format(args.student, s_checkpoint['epoch']))
+                if t_checkpoint['epoch'] != s_checkpoint['epoch']:
+                    raise Exception("=> teacher and student out of sync\nTeacher at epoch: {}\nStudent at epoch: {}"
+                        .format(t_checkpoint['epoch'], s_checkpoint['epoch']))
+            else:
+                print("=> no checkpoint found at '{}'".format(args.resume))
+        elif args.teacher or args.student:
+            raise Exception("Must have both teacher and student or neither")
+
+        t_scheduler = MultiStepLR(t_optimizer, milestones=args.lr_milestones,
+                                gamma=0.1)
+        s_scheduler = MultiStepLR(s_optimizer, milestones=args.lr_milestones,
+                                gamma=0.1)
+
+        # train models
+        mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterion, t_optimizer, s_optimizer, t_scheduler, s_scheduler, t_normalizer, s_normalizer)
+
+        # test best model
+        print('---------Evaluate Model on Test Set---------------')
+        if os.path.isfile(f'checkpoints/student_best_{args.iter}.pth.tar'):
+            best_checkpoint = torch.load(f'checkpoints/student_best_{args.iter}.pth.tar')
+        else:
+            best_checkpoint = torch.load(f'checkpoints/s_checkpoint_{args.iter}.pth.tar')
+        s_model.load_state_dict(best_checkpoint['state_dict'])
+        validate(labeled_loader, s_model, criterion, s_normalizer, test=True, predict=False, append=False)
+        validate(unlabeled_loader, s_model, criterion, s_normalizer, test=True, predict=False, append=True)
+        validate(test_loader, s_model, criterion, s_normalizer, test=True, predict=True, append=True)
 
 
 def mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterion, t_optimizer, s_optimizer, t_scheduler, s_scheduler, t_normalizer, s_normalizer):
@@ -530,3 +592,7 @@ def adjust_learning_rate(optimizer, epoch, k):
     lr = args.lr * (0.1 ** (epoch // k))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
+
+
+if __name__ == '__main__':
+    main()
