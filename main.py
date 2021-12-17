@@ -46,7 +46,6 @@ args = parser.parse_args(sys.argv[1:])
 args.cuda = not args.disable_cuda and torch.cuda.is_available()
 
 root_dir = args.data_options[0]
-true_negative = 0
 
 
 def main():

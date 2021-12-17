@@ -52,14 +52,23 @@ def get_pos_unl_val_test_loader(full_dataset=None, labeled_dataset=None, unlabel
       DataLoader that random samples the test data, returns if
         return_test=True.
     """
-    total_size = len(labeled_dataset)
+
+    if args.uds:
+        total_size = 2*full_dataset.pos_len
+        pos_indices = list(range(full_dataset.pos_len))
+        neg_indices = random.sample(range(full_dataset.pos_len, len(labeled_dataset)), full_dataset.pos_len)
+        labeled_indices =  pos_indices + neg_indices
+        unlabeled_indices = [i for i in range(full_dataset.pos_len, len(labeled_dataset)) if i not in neg_indices]
+    else:
+        total_size = len(labeled_dataset)
+        labeled_indices = list(range(total_size))
+
     if train_ratio is None:
         assert val_ratio + test_ratio < 1
         train_ratio = 1 - val_ratio - test_ratio
         print('[Warning] train_ratio is None, using all training data.')
     else:
         assert train_ratio + val_ratio + test_ratio <= 1
-    indices = list(range(total_size))
     if kwargs['train_size']:
         train_size = kwargs['train_size']
     else:
@@ -72,12 +81,16 @@ def get_pos_unl_val_test_loader(full_dataset=None, labeled_dataset=None, unlabel
         valid_size = kwargs['val_size']
     else:
         valid_size = int(val_ratio * total_size)
-    labeled_sampler = SubsetRandomSampler(indices[:train_size])
-    unlabeled_sampler = SubsetRandomSampler(list(range(len(unlabeled_dataset))))
-    val_sampler = SubsetRandomSampler(
-        indices[-(valid_size + test_size):-test_size])
+    if args.uds:
+        random.shuffle(labeled_indices)
+        unlabeled_sampler = SubsetRandomSampler(unlabeled_indices)
+    else:
+        unlabeled_sampler = SubsetRandomSampler(list(range(len(unlabeled_dataset))))
+
+    labeled_sampler = SubsetRandomSampler(labeled_indices[:train_size])
+    val_sampler = SubsetRandomSampler(labeled_indices[-(valid_size + test_size):-test_size])
     if return_test:
-        test_sampler = SubsetRandomSampler(indices[-test_size:])
+            test_sampler = SubsetRandomSampler(labeled_indices[-test_size:])
 
     labeled_loader = DataLoader(labeled_dataset, batch_size=batch_size,
                               sampler=labeled_sampler,
@@ -333,6 +346,7 @@ class CIFData(Dataset):
                     else:
                         raise Exception("ERROR: dataset value must be 1 or 0")
                 random.shuffle(unlabeled_data)
+                self.pos_len = len(positive_data)
                 self.id_prop_data = positive_data + unlabeled_data
             else:
                 self.id_prop_data = [row for row in reader]

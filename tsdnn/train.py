@@ -190,21 +190,21 @@ def main():
                                 gamma=0.1)
 
         # train models
-        mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterion, t_optimizer, s_optimizer, t_scheduler, s_scheduler, t_normalizer, s_normalizer)
+        mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterion, t_optimizer, s_optimizer, t_scheduler, s_scheduler, t_normalizer, s_normalizer, mx)
 
         # test best model
         print('---------Evaluate Model on Test Set---------------')
-        if os.path.isfile(f'checkpoints/student_best_{args.iter}.pth.tar'):
-            best_checkpoint = torch.load(f'checkpoints/student_best_{args.iter}.pth.tar')
+        if os.path.isfile(f'checkpoints/student_best_{args.iter+mx}.pth.tar'):
+            best_checkpoint = torch.load(f'checkpoints/student_best_{args.iter+mx}.pth.tar')
         else:
-            best_checkpoint = torch.load(f'checkpoints/s_checkpoint_{args.iter}.pth.tar')
+            best_checkpoint = torch.load(f'checkpoints/s_checkpoint_{args.iter+mx}.pth.tar')
         s_model.load_state_dict(best_checkpoint['state_dict'])
-        validate(labeled_loader, s_model, criterion, s_normalizer, test=True, predict=False, append=False)
-        validate(unlabeled_loader, s_model, criterion, s_normalizer, test=True, predict=False, append=True)
-        validate(test_loader, s_model, criterion, s_normalizer, test=True, predict=True, append=True)
+        validate(labeled_loader, s_model, criterion, s_normalizer, test=True, predict=False, append=False, mx=mx)
+        validate(unlabeled_loader, s_model, criterion, s_normalizer, test=True, predict=False, append=True, mx=mx)
+        validate(test_loader, s_model, criterion, s_normalizer, test=True, predict=True, append=True, mx=mx)
 
 
-def mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterion, t_optimizer, s_optimizer, t_scheduler, s_scheduler, t_normalizer, s_normalizer):
+def mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterion, t_optimizer, s_optimizer, t_scheduler, s_scheduler, t_normalizer, s_normalizer, mx):
     global t_best_mae_error, s_best_mae_error
 
     labeled_iter = iter(labeled_loader)
@@ -387,7 +387,7 @@ def mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterio
                 'optimizer': t_optimizer.state_dict(),
                 'normalizer': t_normalizer.state_dict(),
                 'args': vars(args)
-            }, t_is_best, False, f'checkpoints/t_checkpoint_{args.iter}.pth.tar')
+            }, t_is_best, False, f'checkpoints/t_checkpoint_{args.iter+mx}.pth.tar', mx=mx)
 
             s_best_mae_error = max(s_mae_error, s_best_mae_error)
             save_checkpoint({
@@ -397,10 +397,10 @@ def mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterio
                 'optimizer': s_optimizer.state_dict(),
                 'normalizer': s_normalizer.state_dict(),
                 'args': vars(args)
-            }, s_is_best, True, f'checkpoints/s_checkpoint_{args.iter}.pth.tar')
+            }, s_is_best, True, f'checkpoints/s_checkpoint_{args.iter+mx}.pth.tar', mx=mx)
 
 
-def validate(val_loader, model, criterion, normalizer, test=False, predict=False, append=False):
+def validate(val_loader, model, criterion, normalizer, test=False, predict=False, append=False, mx):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     s_losses = AverageMeter()
@@ -483,18 +483,13 @@ def validate(val_loader, model, criterion, normalizer, test=False, predict=False
     if test:
         star_label = '**'
         import csv
-        if not predict and not args.uds:
-            with open(f'results/validation/test_results_{args.iter}.csv', ('w' if not append else 'a'), newline='') as f:
-                writer = csv.writer(f)
-                for cif_id, pred in zip(test_cif_ids, test_preds):
-                    writer.writerow((cif_id, pred))
-        elif not predict and args.uds:
-            with open(f'results/validation/test_results_{args.iter}_{args.uds}.csv', ('w' if not append else 'a+'), newline='') as f:
+        if not predict:
+            with open(f'results/validation/test_results_{args.iter+mx}.csv', ('w' if not append else 'a'), newline='') as f:
                 writer = csv.writer(f)
                 for cif_id, pred in zip(test_cif_ids, test_preds):
                     writer.writerow((cif_id, pred))
         else:
-            with open(f'results/predictions/predictions_{args.iter}.csv', 'w', newline='') as f:
+            with open(f'results/predictions/predictions_{args.iter+mx}.csv', 'w', newline='') as f:
                 writer = csv.writer(f)
                 for cif_id, pred in zip(test_cif_ids, test_preds):
                     writer.writerow((cif_id, pred))
@@ -577,13 +572,13 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def save_checkpoint(state, is_best, isStudent, filename):
+def save_checkpoint(state, is_best, isStudent, filename, mx):
     torch.save(state, filename)
     if is_best:
         if isStudent:
-            shutil.copyfile(filename, f'checkpoints/student_best_{args.iter}.pth.tar')
+            shutil.copyfile(filename, f'checkpoints/student_best_{args.iter+mx}.pth.tar')
         else:
-            shutil.copyfile(filename, f'checkpoints/teacher_best_{args.iter}.pth.tar')
+            shutil.copyfile(filename, f'checkpoints/teacher_best_{args.iter+mx}.pth.tar')
 
 
 def adjust_learning_rate(optimizer, epoch, k):
