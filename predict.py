@@ -12,9 +12,9 @@ from sklearn import metrics
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
-from cgcnn.data import CIFData
-from cgcnn.data import collate_pool
-from cgcnn.model import CrystalGraphConvNet
+from tsdnn.data import CIFData
+from tsdnn.data import collate_pool
+from tsdnn.model import CrystalGraphConvNet
 
 parser = argparse.ArgumentParser(description='Crystal graph neural networks')
 parser.add_argument('modelpath', help='path to the trained model.')
@@ -58,7 +58,7 @@ def main():
     global args, model_args, best_mae_error
 
     # load data
-    dataset = CIFData(args.cifpath, labeled=True, predict=True)
+    dataset = CIFData(args.cifpath, predict=True)
     collate_fn = collate_pool
     test_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True,
                              num_workers=args.workers, collate_fn=collate_fn,

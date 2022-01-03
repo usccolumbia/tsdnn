@@ -16,10 +16,10 @@ from torch.utils.data.dataloader import default_collate
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
-def get_pos_unl_val_test_loader(labeled_dataset, unlabeled_dataset, collate_fn=default_collate,
+def get_pos_unl_val_test_loader(full_dataset=None, labeled_dataset=None, unlabeled_dataset=None, collate_fn=default_collate,
                               batch_size=64, train_ratio=None,
                               val_ratio=0.1, test_ratio=0.1, return_test=False,
-                              num_workers=1, pin_memory=False, **kwargs):
+                              num_workers=1, pin_memory=False, uds=False, **kwargs):
     """
     Utility function for dividing a dataset to train, val, test datasets.
 
@@ -52,14 +52,23 @@ def get_pos_unl_val_test_loader(labeled_dataset, unlabeled_dataset, collate_fn=d
       DataLoader that random samples the test data, returns if
         return_test=True.
     """
-    total_size = len(labeled_dataset)
+
+    if uds:
+        total_size = 2*full_dataset.pos_len
+        pos_indices = list(range(full_dataset.pos_len))
+        neg_indices = random.sample(range(full_dataset.pos_len, len(full_dataset)), full_dataset.pos_len)
+        labeled_indices =  pos_indices + neg_indices
+        unlabeled_indices = [i for i in range(full_dataset.pos_len, len(full_dataset)) if i not in neg_indices]
+    else:
+        total_size = len(labeled_dataset)
+        labeled_indices = list(range(total_size))
+
     if train_ratio is None:
         assert val_ratio + test_ratio < 1
         train_ratio = 1 - val_ratio - test_ratio
         print('[Warning] train_ratio is None, using all training data.')
     else:
         assert train_ratio + val_ratio + test_ratio <= 1
-    indices = list(range(total_size))
     if kwargs['train_size']:
         train_size = kwargs['train_size']
     else:
@@ -72,30 +81,53 @@ def get_pos_unl_val_test_loader(labeled_dataset, unlabeled_dataset, collate_fn=d
         valid_size = kwargs['val_size']
     else:
         valid_size = int(val_ratio * total_size)
-    labeled_sampler = SubsetRandomSampler(indices[:train_size])
-    unlabeled_sampler = SubsetRandomSampler(list(range(len(unlabeled_dataset))))
-    val_sampler = SubsetRandomSampler(
-        indices[-(valid_size + test_size):-test_size])
-    if return_test:
-        test_sampler = SubsetRandomSampler(indices[-test_size:])
+    if uds:
+        random.shuffle(labeled_indices)
+        unlabeled_sampler = SubsetRandomSampler(unlabeled_indices)
+    else:
+        unlabeled_sampler = SubsetRandomSampler(list(range(len(unlabeled_dataset))))
 
-    labeled_loader = DataLoader(labeled_dataset, batch_size=batch_size,
-                              sampler=labeled_sampler,
-                              num_workers=num_workers,
-                              collate_fn=collate_fn, pin_memory=pin_memory)
-    unlabeled_loader = DataLoader(unlabeled_dataset, batch_size=batch_size,
-                              sampler=unlabeled_sampler,
-                              num_workers=num_workers,
-                              collate_fn=collate_fn, pin_memory=pin_memory)
-    val_loader = DataLoader(labeled_dataset, batch_size=batch_size,
-                            sampler=val_sampler,
-                            num_workers=num_workers,
-                            collate_fn=collate_fn, pin_memory=pin_memory)
+    labeled_sampler = SubsetRandomSampler(labeled_indices[:train_size])
+    val_sampler = SubsetRandomSampler(labeled_indices[-(valid_size + test_size):-test_size])
     if return_test:
-        test_loader = DataLoader(labeled_dataset, batch_size=batch_size,
-                                 sampler=test_sampler,
-                                 num_workers=num_workers,
-                                 collate_fn=collate_fn, pin_memory=pin_memory)
+            test_sampler = SubsetRandomSampler(labeled_indices[-test_size:])
+    
+    if uds:
+        labeled_loader = DataLoader(full_dataset, batch_size=batch_size,
+                                  sampler=labeled_sampler,
+                                  num_workers=num_workers,
+                                  collate_fn=collate_fn, pin_memory=pin_memory)
+        unlabeled_loader = DataLoader(full_dataset, batch_size=batch_size,
+                                  sampler=unlabeled_sampler,
+                                  num_workers=num_workers,
+                                  collate_fn=collate_fn, pin_memory=pin_memory)
+        val_loader = DataLoader(full_dataset, batch_size=batch_size,
+                                sampler=val_sampler,
+                                num_workers=num_workers,
+                                collate_fn=collate_fn, pin_memory=pin_memory)
+        if return_test:
+            test_loader = DataLoader(full_dataset, batch_size=batch_size,
+                                     sampler=test_sampler,
+                                     num_workers=num_workers,
+                                     collate_fn=collate_fn, pin_memory=pin_memory)
+    else:
+        labeled_loader = DataLoader(labeled_dataset, batch_size=batch_size,
+                                  sampler=labeled_sampler,
+                                  num_workers=num_workers,
+                                  collate_fn=collate_fn, pin_memory=pin_memory)
+        unlabeled_loader = DataLoader(unlabeled_dataset, batch_size=batch_size,
+                                  sampler=unlabeled_sampler,
+                                  num_workers=num_workers,
+                                  collate_fn=collate_fn, pin_memory=pin_memory)
+        val_loader = DataLoader(labeled_dataset, batch_size=batch_size,
+                                sampler=val_sampler,
+                                num_workers=num_workers,
+                                collate_fn=collate_fn, pin_memory=pin_memory)
+        if return_test:
+            test_loader = DataLoader(labeled_dataset, batch_size=batch_size,
+                                     sampler=test_sampler,
+                                     num_workers=num_workers,
+                                     collate_fn=collate_fn, pin_memory=pin_memory)
     if return_test:
         return labeled_loader, unlabeled_loader, val_loader, test_loader
     else:
@@ -304,18 +336,41 @@ class CIFData(Dataset):
     target: torch.Tensor shape (1, )
     cif_id: str or int
     """
-    def __init__(self, root_dir, labeled, max_num_nbr=12, radius=16, dmin=0, step=0.2,
-                 random_seed=123, predict=False):
+    def __init__(self, root_dir, labeled=False, max_num_nbr=12, radius=16, dmin=0, step=0.2,
+                 random_seed=123, predict=False, uds=False):
         self.root_dir = root_dir
         self.max_num_nbr, self.radius = max_num_nbr, radius
         assert os.path.exists(root_dir), 'root_dir does not exist!'
-        id_prop_file = os.path.join(self.root_dir, (('data_labeled.csv' if labeled else 'data_unlabeled.csv') if not predict else 'data_test.csv'))
+        if uds:
+            id_prop_file = os.path.join(self.root_dir, 'dataset.csv')
+        elif labeled:
+            id_prop_file = os.path.join(self.root_dir, 'data_labeled.csv')
+        elif predict:
+            id_prop_file = os.path.join(self.root_dir, 'data_test.csv')
+        else:
+            id_prop_file = os.path.join(self.root_dir, 'data_unlabeled.csv')
         assert os.path.exists(id_prop_file), f'{id_prop_file} does not exist!'
+
+        random.seed(random_seed)
+        positive_data = []
+        unlabeled_data = []
         with open(id_prop_file) as f:
             reader = csv.reader(f)
-            self.id_prop_data = [row for row in reader]
-        random.seed(random_seed)
-        random.shuffle(self.id_prop_data)
+            if uds:
+                for row in reader:
+                    if int(row[1]) == 1:
+                        positive_data.append(row)
+                    elif int(row[1]) == 0:
+                        unlabeled_data.append(row)
+                    else:
+                        raise Exception("ERROR: dataset value must be 1 or 0")
+                random.shuffle(unlabeled_data)
+                self.pos_len = len(positive_data)
+                self.id_prop_data = positive_data + unlabeled_data
+            else:
+                self.id_prop_data = [row for row in reader]
+                random.shuffle(self.id_prop_data)
+
         atom_init_file = os.path.join(self.root_dir, 'atom_init.json')
         assert os.path.exists(atom_init_file), 'atom_init.json does not exist!'
         self.ari = AtomCustomJSONInitializer(atom_init_file)
