@@ -155,7 +155,7 @@ After predicting, you will get one file in `synth-tsdnn` directory:
 
 ## Data
 
-To reproduce our paper, you can download the corresponding datasets following the [instruction](data/material-data). Each dataset discussed can be found in `data/datasets/`
+To reproduce our paper, you can download the corresponding datasets following the [download instructions](data/download). Each dataset discussed can be found in `data/datasets/`
 
 ## Authors
 
