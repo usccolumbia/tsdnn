@@ -10,128 +10,98 @@ import warnings
 import pandas as pd
 import numpy as np
 import torch
+from tqdm import tqdm
 from pymatgen.core.structure import Structure
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
-def get_pos_unl_val_test_loader(full_dataset=None, labeled_dataset=None, unlabeled_dataset=None, collate_fn=default_collate,
-                              batch_size=64, train_ratio=None,
-                              val_ratio=0.1, test_ratio=0.1, return_test=False,
-                              num_workers=1, pin_memory=False, uds=False, **kwargs):
-    """
-    Utility function for dividing a dataset to train, val, test datasets.
+def split_bagging(id_prop_folder, bagging_size, folder, gen_test=True):
+    df = pd.read_csv(os.path.join(id_prop_folder, 'dataset.csv'), header=None)
 
-    !!! The dataset needs to be shuffled before using the function !!!
+    # Split positive/unlabeled data
+    exp = []
+    vir = []
+    for i in range(len(df)):
+        if df[1][i] == 1:
+            exp.append(df[0][i])
+        elif df[1][i] == 0:
+            vir.append(df[0][i])
+        else:
+            raise Exception("ERROR: prop value must be 1 or 0")
 
-    Parameters
-    ----------
-    labeled_dataset: torch.utils.data.Dataset
-      The full labeled dataset to be divided.
-    unlabeled_dataset: torch.utils.data.Dataset
-      The full unlabeled dataset.
-    collate_fn: torch.utils.data.DataLoader
-    batch_size: int
-    train_ratio: float
-    val_ratio: float
-    test_ratio: float
-    return_test: bool
-      Whether to return the test dataset loader. If False, the last test_size
-      data will be hidden.
-    num_workers: int
-    pin_memory: bool
+    positive = pd.DataFrame()
+    positive[0] = exp
+    positive[1] = [1 for _ in range(len(exp))]
 
-    Returns
-    -------
-    labeled: torch.utils.data.DataLoader
-      DataLoader that random samples the training data.
-    val_loader: torch.utils.data.DataLoader
-      DataLoader that random samples the validation data.
-    (test_loader): torch.utils.data.DataLoader
-      DataLoader that random samples the test data, returns if
-        return_test=True.
-    """
+    unlabeled = pd.DataFrame()
+    unlabeled[0] = vir
+    unlabeled[1] = [0 for _ in range(len(vir))]
 
-    if uds:
-        total_size = 2*full_dataset.pos_len
-        pos_indices = list(range(full_dataset.pos_len))
-        neg_indices = random.sample(range(full_dataset.pos_len, len(full_dataset)), full_dataset.pos_len)
-        labeled_indices =  pos_indices + neg_indices
-        unlabeled_indices = [i for i in range(full_dataset.pos_len, len(full_dataset)) if i not in neg_indices]
+    # Sample positive data for validation and training
+    if gen_test:
+        valid_positive = positive.sample(frac=0.2, random_state=1234)
+        train_positive = positive.drop(valid_positive.index)
     else:
-        total_size = len(labeled_dataset)
-        labeled_indices = list(range(total_size))
+        train_positive = positive
 
-    if train_ratio is None:
-        assert val_ratio + test_ratio < 1
-        train_ratio = 1 - val_ratio - test_ratio
-        print('[Warning] train_ratio is None, using all training data.')
-    else:
-        assert train_ratio + val_ratio + test_ratio <= 1
-    if kwargs['train_size']:
-        train_size = kwargs['train_size']
-    else:
-        train_size = int(train_ratio * total_size)
-    if kwargs['test_size']:
-        test_size = kwargs['test_size']
-    else:
-        test_size = int(test_ratio * total_size)
-    if kwargs['val_size']:
-        valid_size = kwargs['val_size']
-    else:
-        valid_size = int(val_ratio * total_size)
-    if uds:
-        random.shuffle(labeled_indices)
-        unlabeled_sampler = SubsetRandomSampler(unlabeled_indices)
-    else:
-        unlabeled_sampler = SubsetRandomSampler(list(range(len(unlabeled_dataset))))
+    os.makedirs(folder, exist_ok=True)
 
-    labeled_sampler = SubsetRandomSampler(labeled_indices[:train_size])
-    val_sampler = SubsetRandomSampler(labeled_indices[-(valid_size + test_size):-test_size])
-    if return_test:
-            test_sampler = SubsetRandomSampler(labeled_indices[-test_size:])
-    
-    if uds:
-        labeled_loader = DataLoader(full_dataset, batch_size=batch_size,
-                                  sampler=labeled_sampler,
-                                  num_workers=num_workers,
-                                  collate_fn=collate_fn, pin_memory=pin_memory)
-        unlabeled_loader = DataLoader(full_dataset, batch_size=batch_size,
-                                  sampler=unlabeled_sampler,
-                                  num_workers=num_workers,
-                                  collate_fn=collate_fn, pin_memory=pin_memory)
-        val_loader = DataLoader(full_dataset, batch_size=batch_size,
-                                sampler=val_sampler,
-                                num_workers=num_workers,
-                                collate_fn=collate_fn, pin_memory=pin_memory)
-        if return_test:
-            test_loader = DataLoader(full_dataset, batch_size=batch_size,
-                                     sampler=test_sampler,
-                                     num_workers=num_workers,
-                                     collate_fn=collate_fn, pin_memory=pin_memory)
-    else:
-        labeled_loader = DataLoader(labeled_dataset, batch_size=batch_size,
-                                  sampler=labeled_sampler,
-                                  num_workers=num_workers,
-                                  collate_fn=collate_fn, pin_memory=pin_memory)
-        unlabeled_loader = DataLoader(unlabeled_dataset, batch_size=batch_size,
-                                  sampler=unlabeled_sampler,
-                                  num_workers=num_workers,
-                                  collate_fn=collate_fn, pin_memory=pin_memory)
-        val_loader = DataLoader(labeled_dataset, batch_size=batch_size,
-                                sampler=val_sampler,
-                                num_workers=num_workers,
-                                collate_fn=collate_fn, pin_memory=pin_memory)
-        if return_test:
-            test_loader = DataLoader(labeled_dataset, batch_size=batch_size,
-                                     sampler=test_sampler,
-                                     num_workers=num_workers,
-                                     collate_fn=collate_fn, pin_memory=pin_memory)
-    if return_test:
-        return labeled_loader, unlabeled_loader, val_loader, test_loader
-    else:
-        return labeled_loader, unlabeled_loader, val_loader
+    # Sample negative data for training
+    for i in tqdm(range(bagging_size)):
+        # Randomly labeling to negative
+        negative = unlabeled.sample(n=len(positive[0]))
+        if gen_test:
+            valid_negative = negative.sample(frac=0.2, random_state=1234)
+            train_negative = negative.drop(valid_negative.index)
+            valid = pd.concat([valid_positive, valid_negative])
+
+        else:
+            train_negative = negative
+            valid = pd.read_csv(os.path.join(
+                id_prop_folder, 'data_test.csv'), header=None)
+
+        valid.to_csv(os.path.join(folder, 'data_test_' + str(i)),
+                     mode='w', index=False, header=False)
+        train = pd.concat([train_positive, train_negative])
+        train.to_csv(os.path.join(folder, 'data_labeled_' + str(i)),
+                     mode='w', index=False, header=False)
+
+    # Generate unlabeled data
+        test_unlabel = unlabeled.drop(negative.index)
+        test_unlabel.to_csv(os.path.join(
+            folder, 'data_unlabeled_' + str(i)), mode='w', index=False, header=False)
+
+
+def bootstrap_aggregating(bagging_size, prediction=False):
+
+    predval_dict = {}
+
+    for i in tqdm(range(bagging_size), desc='Aggregating results'):
+        if prediction:
+            filename = 'results/predictions/predictions_' + str(i) + '.csv'
+        else:
+            filename = 'results/validation/test_results_' + str(i) + '.csv'
+        df = pd.read_csv(os.path.join(filename), header=None)
+        id_list = df.iloc[:, 0].tolist()
+        pred_list = df.iloc[:, 1].tolist()
+        for idx, mat_id in enumerate(id_list):
+            if mat_id in predval_dict:
+                predval_dict[mat_id].append(float(pred_list[idx]))
+            else:
+                predval_dict[mat_id] = [float(pred_list[idx])]
+
+    print("Writing results to file...")
+    with open('test_results_ensemble_' + str(bagging_size) + 'models.csv', "w") as g:
+        # mp-id, CLscore, # of bagging size
+        g.write("id,score,bagging")
+
+        for key, values in predval_dict.items():
+            g.write('\n')
+            g.write(key + ',' + str(np.mean(np.array(values))) +
+                    ',' + str(len(values)))
+    print("Done")
 
 
 def collate_pool(dataset_list):
@@ -176,8 +146,8 @@ def collate_pool(dataset_list):
         n_i = atom_fea.shape[0]  # number of atoms for this crystal
         batch_atom_fea.append(atom_fea)
         batch_nbr_fea.append(nbr_fea)
-        batch_nbr_fea_idx.append(nbr_fea_idx+base_idx)
-        new_idx = torch.LongTensor(np.arange(n_i)+base_idx)
+        batch_nbr_fea_idx.append(nbr_fea_idx + base_idx)
+        new_idx = torch.LongTensor(np.arange(n_i) + base_idx)
         crystal_atom_idx.append(new_idx)
         batch_target.append(target)
         batch_cif_ids.append(cif_id)
@@ -196,6 +166,7 @@ class GaussianDistance(object):
 
     Unit: angstrom
     """
+
     def __init__(self, dmin, dmax, step, var=None):
         """
         Parameters
@@ -210,7 +181,7 @@ class GaussianDistance(object):
         """
         assert dmin < dmax
         assert dmax - dmin > step
-        self.filter = np.arange(dmin, dmax+step, step)
+        self.filter = np.arange(dmin, dmax + step, step)
         if var is None:
             var = step
         self.var = var
@@ -241,6 +212,7 @@ class AtomInitializer(object):
 
     !!! Use one AtomInitializer per dataset !!!
     """
+
     def __init__(self, atom_types):
         self.atom_types = set(atom_types)
         self._embedding = {}
@@ -277,6 +249,7 @@ class AtomCustomJSONInitializer(AtomInitializer):
     elem_embedding_file: str
         The path to the .json file
     """
+
     def __init__(self, elem_embedding_file):
         with open(elem_embedding_file) as f:
             elem_embedding = json.load(f)
@@ -336,6 +309,7 @@ class CIFData(Dataset):
     target: torch.Tensor shape (1, )
     cif_id: str or int
     """
+
     def __init__(self, root_dir, labeled=False, max_num_nbr=12, radius=16, dmin=0, step=0.2,
                  random_seed=123, predict=False, uds=False):
         self.root_dir = root_dir
@@ -383,7 +357,7 @@ class CIFData(Dataset):
     def __getitem__(self, idx):
         cif_id, target = self.id_prop_data[idx]
         crystal = Structure.from_file(os.path.join(self.root_dir,
-                                                   cif_id+'.cif'))
+                                                   cif_id + '.cif'))
         atom_fea = np.vstack([self.ari.get_atom_fea(crystal[i].specie.number)
                               for i in range(len(crystal))])
         atom_fea = torch.Tensor(atom_fea)
