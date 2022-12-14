@@ -116,7 +116,7 @@ def main():
 
     # load data
     if args.uds:
-        split_bagging(args.data_options[0], os.path.join(
+        split_bagging(args.data_options[0], args.uds, os.path.join(
             args.data_options[0], 'bagging'), gen_test=not modern)
 
     collate_fn = collate_pool
