@@ -143,7 +143,7 @@ if __name__ == '__main__':
     fea_dict = {}
 
     assert os.path.exists(root_dir), 'root_dir does not exist!'
-    id_prop_file = os.path.join(root_dir, args.dataset)
+    id_prop_file = args.dataset
     assert os.path.exists(id_prop_file), 'dataset.csv does not exist!'
     with open(id_prop_file) as f:
         reader = csv.reader(f)
