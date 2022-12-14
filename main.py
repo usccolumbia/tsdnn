@@ -99,7 +99,7 @@ def preload(preload_folder, id_prop_file):
         reader = csv.reader(g)
         cif_list = [row[0] for row in reader]
 
-    for cif_id in tqdm(cif_list):
+    for cif_id in tqdm(cif_list, desc=f"Preloading {id_prop_file}"):
         with open(preload_folder + '/' + cif_id + '.pickle', 'rb') as f:
             data.append(pickle.load(f))
 

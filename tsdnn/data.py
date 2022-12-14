@@ -49,7 +49,7 @@ def split_bagging(id_prop_folder, bagging_size, folder, gen_test=True):
     os.makedirs(folder, exist_ok=True)
 
     # Sample negative data for training
-    for i in tqdm(range(bagging_size)):
+    for i in tqdm(range(bagging_size), desc='Bagging iterations'):
         # Randomly labeling to negative
         negative = unlabeled.sample(n=len(positive[0]))
         if gen_test:
