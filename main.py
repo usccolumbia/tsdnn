@@ -128,11 +128,11 @@ def main():
     for mx in range(num_to_train):
         if args.uds:
             labeled_dataset = preload(preload_folder=args.graph, id_prop_file=os.path.join(
-                args.data_options[0], 'bagging/data_labeled_' + str(mx)))
+                args.data_options[0], 'bagging/data_labeled_' + str(mx) + '.csv'))
             unlabeled_dataset = preload(preload_folder=args.graph, id_prop_file=os.path.join(
-                args.data_options[0], 'bagging/data_unlabeled_' + str(mx)))
+                args.data_options[0], 'bagging/data_unlabeled_' + str(mx) + '.csv'))
             test_dataset = preload(preload_folder=args.graph, id_prop_file=os.path.join(
-                args.data_options[0], 'bagging/data_test_' + str(mx)))
+                args.data_options[0], 'bagging/data_test_' + str(mx) + '.csv'))
         else:
             labeled_dataset = preload(preload_folder=args.graph, id_prop_file=os.path.join(
                 args.data_options[0], 'data_labeled.csv'))

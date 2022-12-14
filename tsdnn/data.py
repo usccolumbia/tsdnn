@@ -62,16 +62,16 @@ def split_bagging(id_prop_folder, bagging_size, folder, gen_test=True):
             valid = pd.read_csv(os.path.join(
                 id_prop_folder, 'data_test.csv'), header=None)
 
-        valid.to_csv(os.path.join(folder, 'data_test_' + str(i)),
+        valid.to_csv(os.path.join(folder, 'data_test_' + str(i) + '.csv'),
                      mode='w', index=False, header=False)
         train = pd.concat([train_positive, train_negative])
-        train.to_csv(os.path.join(folder, 'data_labeled_' + str(i)),
+        train.to_csv(os.path.join(folder, 'data_labeled_' + str(i) + '.csv'),
                      mode='w', index=False, header=False)
 
     # Generate unlabeled data
         test_unlabel = unlabeled.drop(negative.index)
         test_unlabel.to_csv(os.path.join(
-            folder, 'data_unlabeled_' + str(i)), mode='w', index=False, header=False)
+            folder, 'data_unlabeled_' + str(i)) + '.csv', mode='w', index=False, header=False)
 
 
 def bootstrap_aggregating(bagging_size, prediction=False):
