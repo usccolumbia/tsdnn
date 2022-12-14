@@ -17,8 +17,8 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import MultiStepLR
 
-from tsdnn.data import split_bagging, aggregate_bagging, CIFData
-from tsdnn.data import collate_pool, get_pos_unl_val_test_loader
+from tsdnn.data import split_bagging, bootstrap_aggregating
+from tsdnn.data import collate_pool
 from tsdnn.model import CrystalGraphConvNet
 
 
@@ -250,7 +250,9 @@ def main():
         # validate(labeled_loader, s_model, criterion, s_normalizer, test=True, predict=False, append=False, mx=mx)
         validate(unlabeled_loader, s_model, criterion, s_normalizer,
                  test=True, predict=False, append=False, mx=mx)
-        # validate(test_loader, s_model, criterion, s_normalizer, test=True, predict=True, append=True, mx=mx)
+
+    bootstrap_aggregating(num_to_train)
+    # validate(test_loader, s_model, criterion, s_normalizer, test=True, predict=True, append=True, mx=mx)
 
 
 def mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterion, t_optimizer, s_optimizer, t_scheduler, s_scheduler, t_normalizer, s_normalizer, mx):
