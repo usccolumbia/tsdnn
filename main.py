@@ -90,9 +90,6 @@ args.cuda = not args.disable_cuda and torch.cuda.is_available()
 root_dir = args.data_options[0]
 
 
-modern = False
-
-
 def preload(preload_folder, id_prop_file):
     data = []
     with open(id_prop_file) as g:
@@ -117,7 +114,7 @@ def main():
     # load data
     if args.uds:
         split_bagging(args.data_options[0], args.uds, os.path.join(
-            args.data_options[0], 'bagging'), gen_test=not modern)
+            args.data_options[0], 'bagging'), gen_test=True)
 
     collate_fn = collate_pool
 
@@ -252,7 +249,9 @@ def main():
                  test=True, predict=False, append=False, mx=mx)
 
     bootstrap_aggregating(num_to_train)
-    # validate(test_loader, s_model, criterion, s_normalizer, test=True, predict=True, append=True, mx=mx)
+    if not args.uds:
+        validate(val_loader, s_model, criterion, s_normalizer,
+                 test=True, predict=True, append=False, mx=0)
 
 
 def mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterion, t_optimizer, s_optimizer, t_scheduler, s_scheduler, t_normalizer, s_normalizer, mx):
@@ -442,7 +441,7 @@ def mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterio
                 'optimizer': t_optimizer.state_dict(),
                 'normalizer': t_normalizer.state_dict(),
                 'args': vars(args)
-            }, t_is_best, False, f'checkpoints/t_checkpoint_{args.iter+mx}.pth.tar', mx=mx)
+            }, t_is_best, False, f'checkpoints/t_checkpoint_{args.iter}_{mx}.pth.tar', mx=mx)
 
             s_best_mae_error = max(s_mae_error, s_best_mae_error)
             save_checkpoint({
@@ -452,7 +451,7 @@ def mpl(labeled_loader, unlabeled_loader, val_loader, t_model, s_model, criterio
                 'optimizer': s_optimizer.state_dict(),
                 'normalizer': s_normalizer.state_dict(),
                 'args': vars(args)
-            }, s_is_best, True, f'checkpoints/s_checkpoint_{args.iter+mx}.pth.tar', mx=mx)
+            }, s_is_best, True, f'checkpoints/s_checkpoint_{args.iter}_{mx}.pth.tar', mx=mx)
 
 
 def validate(val_loader, model, criterion, normalizer, test=False, predict=False, append=False, mx=0):
