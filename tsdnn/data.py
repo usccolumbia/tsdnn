@@ -74,15 +74,17 @@ def split_bagging(id_prop_folder, bagging_size, folder, gen_test=True):
             folder, 'data_unlabeled_' + str(i)) + '.csv', mode='w', index=False, header=False)
 
 
-def bootstrap_aggregating(bagging_size, prediction=False):
+def bootstrap_aggregating(iteration, bagging_size, prediction=False):
 
     predval_dict = {}
 
     for i in tqdm(range(bagging_size), desc='Aggregating results'):
         if prediction:
-            filename = 'results/predictions/predictions_' + str(i) + '.csv'
+            filename = 'results/predictions/predictions_' + \
+                str(iteration) + '.csv'
         else:
-            filename = 'results/validation/test_results_' + str(i) + '.csv'
+            filename = 'results/validation/test_results_' + \
+                str(iteration) + '.csv'
         df = pd.read_csv(os.path.join(filename), header=None)
         id_list = df.iloc[:, 0].tolist()
         pred_list = df.iloc[:, 1].tolist()
@@ -93,7 +95,7 @@ def bootstrap_aggregating(bagging_size, prediction=False):
                 predval_dict[mat_id] = [float(pred_list[idx])]
 
     print("Writing results to file...")
-    with open('test_results_ensemble_' + str(bagging_size) + 'models.csv', "w") as g:
+    with open('test_results_ensemble_' + str(iteration) + '_' + str(bagging_size) + 'models.csv', "w") as g:
         # mp-id, CLscore, # of bagging size
         g.write("id,score,bagging")
 

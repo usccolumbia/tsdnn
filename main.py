@@ -538,12 +538,12 @@ def validate(val_loader, model, criterion, normalizer, test=False, predict=False
         star_label = '**'
         import csv
         if not predict:
-            with open(f'results/validation/test_results_{args.iter+mx}.csv', ('w' if not append else 'a'), newline='') as f:
+            with open(f'results/validation/test_results_{args.iter}_{mx}.csv', ('w' if not append else 'a'), newline='') as f:
                 writer = csv.writer(f)
                 for cif_id, pred in zip(test_cif_ids, test_preds):
                     writer.writerow((cif_id, pred))
         else:
-            with open(f'results/predictions/predictions_{args.iter+mx}.csv', 'w', newline='') as f:
+            with open(f'results/predictions/predictions_{args.iter}_{mx}.csv', 'w', newline='') as f:
                 writer = csv.writer(f)
                 for cif_id, pred in zip(test_cif_ids, test_preds):
                     writer.writerow((cif_id, pred))
