@@ -90,7 +90,7 @@ args.cuda = not args.disable_cuda and torch.cuda.is_available()
 root_dir = args.data_options[0]
 
 
-modern = True
+modern = False
 
 
 def preload(preload_folder, id_prop_file):
