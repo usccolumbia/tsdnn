@@ -248,7 +248,7 @@ def main():
         validate(unlabeled_loader, s_model, criterion, s_normalizer,
                  test=True, predict=False, append=False, mx=mx)
 
-    bootstrap_aggregating(num_to_train)
+    bootstrap_aggregating(args.iter, num_to_train)
     if not args.uds:
         validate(val_loader, s_model, criterion, s_normalizer,
                  test=True, predict=True, append=False, mx=0)
@@ -635,10 +635,10 @@ def save_checkpoint(state, is_best, isStudent, filename, mx):
     if is_best:
         if isStudent:
             shutil.copyfile(
-                filename, f'checkpoints/student_best_{args.iter+mx}.pth.tar')
+                filename, f'checkpoints/student_best_{args.iter}_{mx}.pth.tar')
         else:
             shutil.copyfile(
-                filename, f'checkpoints/teacher_best_{args.iter+mx}.pth.tar')
+                filename, f'checkpoints/teacher_best_{args.iter}_{mx}.pth.tar')
 
 
 def adjust_learning_rate(optimizer, epoch, k):
