@@ -237,12 +237,12 @@ def main():
 
         # test best model
         print('---------Evaluate Model on Test Set---------------')
-        if os.path.isfile(f'checkpoints/student_best_{args.iter+mx}.pth.tar'):
+        if os.path.isfile(f'checkpoints/student_best_{args.iter}_{mx}.pth.tar'):
             best_checkpoint = torch.load(
-                f'checkpoints/student_best_{args.iter+mx}.pth.tar')
+                f'checkpoints/student_best_{args.iter}_{mx}.pth.tar')
         else:
             best_checkpoint = torch.load(
-                f'checkpoints/s_checkpoint_{args.iter+mx}.pth.tar')
+                f'checkpoints/s_checkpoint_{args.iter}_{mx}.pth.tar')
         s_model.load_state_dict(best_checkpoint['state_dict'])
         # validate(labeled_loader, s_model, criterion, s_normalizer, test=True, predict=False, append=False, mx=mx)
         validate(unlabeled_loader, s_model, criterion, s_normalizer,
