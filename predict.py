@@ -1,24 +1,28 @@
-import argparse
 import os
-import shutil
 import sys
 import time
+import torch
+import pickle
+import shutil
+import argparse
 
 import numpy as np
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from tqdm import tqdm
 from sklearn import metrics
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
-
-from tsdnn.data import CIFData
-from tsdnn.data import collate_pool
 from tsdnn.model import CrystalGraphConvNet
+from tsdnn.data import CIFData, collate_pool
 
 parser = argparse.ArgumentParser(description='Crystal graph neural networks')
 parser.add_argument('modelpath', help='path to the trained model.')
-parser.add_argument('cifpath', help='path to the directory of CIF files.')
+parser.add_argument(
+    'rootdir', help='path to the folder containing the dataset file')
+parser.add_argument('--graph', type=str, metavar='N',
+                    help='Folder name for preloaded crystal graph files')
 parser.add_argument('--iter', '-i', default=0, type=int, metavar='N',
                     help='iteration number to save as (default=0)')
 parser.add_argument('-b', '--batch-size', default=256, type=int,
@@ -38,7 +42,7 @@ args = parser.parse_args(sys.argv[1:])
 if os.path.isfile(args.modelpath):
     print("=> loading model params '{}'".format(args.modelpath))
     model_checkpoint = torch.load(args.modelpath,
-                                map_location=lambda storage, loc: storage)
+                                  map_location=lambda storage, loc: storage)
     model_args = argparse.Namespace(**model_checkpoint['args'])
     print("=> loaded model params '{}'".format(args.modelpath))
 else:
@@ -54,11 +58,24 @@ if args.cuda:
 best_mae_error = 0.
 
 
+def preload(preload_folder, id_prop_file):
+    data = []
+    with open(id_prop_file) as g:
+        reader = csv.reader(g)
+        cif_list = [row[0] for row in reader]
+
+    for cif_id in tqdm(cif_list, desc=f"Preloading {id_prop_file}"):
+        with open(preload_folder + '/' + cif_id + '.pickle', 'rb') as f:
+            data.append(pickle.load(f))
+
+    return data
+
+
 def main():
     global args, model_args, best_mae_error
 
     # load data
-    dataset = CIFData(args.cifpath, predict=True)
+    dataset = preload(args.graph, os.path.join(args.rootdir, 'data_test.csv'))
     collate_fn = collate_pool
     test_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True,
                              num_workers=args.workers, collate_fn=collate_fn,
@@ -178,17 +195,17 @@ def validate(val_loader, model, criterion, normalizer, test=False):
                   'Recall {recall.val:.3f} ({recall.avg:.3f})\t'
                   'F1 {f1.val:.3f} ({f1.avg:.3f})\t'
                   'AUC {auc.val:.3f} ({auc.avg:.3f})'.format(
-                   i, len(val_loader), batch_time=batch_time, loss=losses,
-                   accu=accuracies, prec=precisions, recall=recalls,
-                   f1=fscores, auc=auc_scores))
+                      i, len(val_loader), batch_time=batch_time, loss=losses,
+                      accu=accuracies, prec=precisions, recall=recalls,
+                      f1=fscores, auc=auc_scores))
 
     if test:
         star_label = '**'
         import csv
         with open(f'results/predictions/predictions_{args.iter}.csv', 'w') as f:
             writer = csv.writer(f)
-            for cif_id, pred in zip(test_cif_ids, test_preds):
-                writer.writerow((cif_id, pred))
+            for cif_id, pred, target in zip(test_cif_ids, test_preds, test_targets):
+                writer.writerow((cif_id, pred, target))
     else:
         star_label = '*'
     print(' {star} AUC {auc.avg:.3f}'.format(star=star_label,
@@ -198,6 +215,7 @@ def validate(val_loader, model, criterion, normalizer, test=False):
 
 class Normalizer(object):
     """Normalize a Tensor and restore it later. """
+
     def __init__(self, tensor):
         """tensor is taken as a sample to calculate the mean and std"""
         self.mean = torch.mean(tensor)
@@ -248,6 +266,7 @@ def class_eval(prediction, target):
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
+
     def __init__(self):
         self.reset()
 
