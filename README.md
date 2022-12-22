@@ -50,6 +50,13 @@ conda upgrade conda
 conda create -n tsdnn python=3 scikit-learn pytorch torchvision pymatgen -c pytorch -c conda-forge
 ```
 
+Alternatively, you can import our conda environment from the `environment.yml file:
+
+```bash
+conda create -n tsdnn
+conda install -f environment.yml
+```
+
 *Note: this code is tested for PyTorch v1.0.0+ and is not compatible with versions below v0.4.0 due to some breaking changes.
 
 This creates a conda environment for running TSDNN. Before using TSDNN, activate the environment by:
