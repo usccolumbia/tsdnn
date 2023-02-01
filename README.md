@@ -1,8 +1,10 @@
-# Deep Semi-Supervised Teacher-Student Material Synthesizability Prediction
+# Materials Synthesizaability and Stability Prediction Using Semi-Superivsed Teacher-Student Dual Neural Network
+
+Corresponding code for https://doi.org/10.1039/D2DD00098A
 
 Citation: 
 
-Semi-supervised teacher-student deep neural network for materials discovery” by Daniel Gleaves, Edirisuriya M. Dilanga Siriwardane,Yong Zhao, and JianjunHu.
+D. Gleaves, E. Siriwardane, Y. Zhao, N. Fu and J. Hu, Digital Discovery, 2023, DOI: 10.1039/D2DD00098A.
 
 Machine learning and evolution laboratory
 
